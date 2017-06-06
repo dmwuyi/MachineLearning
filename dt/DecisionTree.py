@@ -22,6 +22,7 @@ class DecisionTree:
 
     def __init__(self, iterCnt = 50):
         self.iterCnt = iterCnt
+        self.initPlt()
 
     def calcEntropy(self, dataSet):
         '''
@@ -94,15 +95,114 @@ class DecisionTree:
         sortedClassCnt = sorted(classCnt.items(), key = operator.itemgetter(1),reverse= True)
         return sortedClassCnt[0][0]
 
-    def createTree(self, dataSet):
+    def createTree(self, dataSet, labels):
+        '''
+        创建简单决策树
+        :param dataSet: 数据集
+        :param labels: 标签集(特征集)
+        :return: 构建的树
+        '''
         classList = [da[-1] for da in dataSet]
         if classList.count(classList[0]) == len(classList):  #此时数据中只剩下一个类别  无需划分
             return classList[0]
         if len(dataSet[0]) == 1:  # 此时 所有特征处理完毕，只剩下最后的标签信息
             return self.majorityCnt(classList)
+        bestFeature = self.chooseBestFeatureToSplit(dataSet)  # 通过信息增益选取最好特征进行划分
+        bestFeatureLabel = labels[bestFeature]  # 获取最好特征的标签名
+        tree = {bestFeatureLabel:{}}  # 创建树结构（字典的形式不断存放子节点信息）
+        del(labels[bestFeature]) # 从当前特征集中删掉最好特征
+        featValues = [da[bestFeature] for da in dataSet] # 最好特征中对应的所有可能值
+        featValuesSet = set(featValues)
+        for value in featValuesSet:   # 为特征中的每一个可能值构建一个子节点
+            subLabels = labels[:]
+            tree[bestFeatureLabel][value] = self.createTree(self.splitDataSetByAxis\
+                                                (dataSet, bestFeature, value), subLabels)
+        return tree
 
-        return 0
+    def getNumLeafs(self, tree):
+        '''
+        计算决策树的叶子节点个数
+        :param tree:
+        :return:
+        '''
+        numLeafs = 0
+        secondDict = tree[list(tree.keys())[0]]
+        for key in secondDict.keys():
+            if isinstance(secondDict[key], dict):
+                numLeafs += self.getNumLeafs(secondDict[key])
+            else:
+                numLeafs += 1
+        return numLeafs
+    def getTreeDepth(self, tree):
+        '''
+        计算树的深度
+        :param tree:
+        :return:
+        '''
+        maxDepth = 0
+        secondDict = tree[list(tree.keys())[0]]
+        for key in secondDict.keys():
+            thisDepth = 0
+            if isinstance(secondDict[key], dict):
+                thisDepth = 1+ self.getTreeDepth(secondDict[key])
+            else:
+                thisDepth += 1
+            if thisDepth> maxDepth: maxDepth = thisDepth
+        return maxDepth
 
+#####################  绘图区代码  （绘图没学，直接拿书上的 后面补学） #####################
+    def initPlt(self):
+        import matplotlib.pyplot as plt
+        self.decisionNode = dict(boxstyle="sawtooth", fc="0.8")
+        self.leftNode = dict(boxstyle="round4", fc="0.8")
+        self.arrow_args = dict(arrowstyle="<-")
+
+
+    def plotNode(self, nodeTxt, centerPt, parentPt, nodeType):
+        self.ax1.annotate(nodeTxt, xy=parentPt, xycoords='axes fraction',\
+                    xytext= centerPt, textcoords='axes fraction', va= "center",\
+                    ha="center", bbox=nodeType, arrowprops=self.arrow_args)
+
+    def plotMidText(self, subPt, parentPt, text): # 在父子节点间填充文本信息
+        xMid = (parentPt[0] - subPt[0])/ 2.0 + subPt[0]
+        yMid = (parentPt[1] - subPt[1])/ 2.0 + subPt[1]
+        self.ax1.text(xMid, yMid, text)
+
+    def plotTree(self, tree, parentPt, nodeTxt):
+        numLeaf = self.getNumLeafs(tree)
+        depth = self.getTreeDepth(tree)
+        subPt = (self.xOff + (1.0 + float(numLeaf))/ 2.0/ self.totalW, \
+                     self.yOff)
+        self.plotMidText(subPt, parentPt, nodeTxt)
+        self.plotNode(list(tree.keys())[0], subPt, parentPt, self.decisionNode)
+        self.yOff = self.yOff - 1.0/ self.totalD
+        secondDict = tree[list(tree.keys())[0]]
+        for key in secondDict.keys():
+            if isinstance(secondDict[key], dict):
+                self.plotTree(secondDict[key], subPt, str(key))
+            else:
+                self.xOff = self.xOff + 1.0/ self.totalW
+                self.plotNode(secondDict[key], (self.xOff, self.yOff), subPt, self.leftNode)
+                self.plotMidText((self.xOff, self.yOff), subPt, str(key))
+        self.yOff = self.yOff + 1.0/ self.totalD
+
+    def createPlot(self, inTree):
+        import matplotlib.pyplot as plt
+        fig = plt.figure(1, facecolor='white')
+        fig.clf()
+        axprops = dict(xticks=[], yticks=[])
+        self.ax1 = plt.subplot(111, frameon=False, **axprops)
+        self.totalW = float(self.getNumLeafs(inTree))
+        self.totalD = float(self.getTreeDepth(inTree))
+        self.xOff = -0.5/ self.totalW; self.yOff = 1.0
+        self.plotTree(inTree, (0.5, 1.0), '')
+        # 显示中文
+        import dt.util as myutil
+        myutil.set_chinese()
+
+        plt.show()
+
+#####################  绘图区代码结束  #####################
 
 ########## Test\Run #################
 def createDataSet():
@@ -115,9 +215,16 @@ def createDataSet():
     return dataSet, labels
 if __name__ == '__main__':
     dt = DecisionTree()
-    print( dt.calcEntropy(createDataSet()[0]))
-    print( dt.chooseBestFeatureToSplit(createDataSet()[0]))
-
+    dataSet, labels = createDataSet()
+    print( dt.calcEntropy(dataSet))
+    print( dt.chooseBestFeatureToSplit(dataSet))
+    tree = dt.createTree(dataSet, labels)
+    print( tree)
+    numLeafs = dt.getNumLeafs(tree)
+    print('numLeafs: ', numLeafs)
+    numDepth = dt.getTreeDepth(tree)
+    print("numDepth: ", numDepth)
+    dt.createPlot(tree)
 
 
 
