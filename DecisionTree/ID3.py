@@ -3,7 +3,7 @@
 # @Time    : 2017/6/5 22:23
 # @Author  : dmwuyi
 # @Github  : https://github.com/dmwuyi
-# @File    : DecisionTree.py
+# @File    : ID3.py
 # @Description : 决策树构造流程如下：
 '''
 def createBranch():
@@ -197,7 +197,7 @@ class DecisionTree:
         self.xOff = -0.5/ self.totalW; self.yOff = 1.0
         self.plotTree(inTree, (0.5, 1.0), '')
         # 显示中文
-        import dt.util as myutil
+        import DecisionTree.util as myutil
         myutil.set_chinese()
 
         plt.show()
